@@ -12,11 +12,11 @@ Also includes a gamified web interface (`index.html`) built with the same logic.
 
 ### Web Interface
 
-![Web Interface](<img width="1810" height="984" alt="window" src="https://github.com/user-attachments/assets/7f7e9601-ab6b-4702-be2e-2859def66e8a" />)
-
-
+![Web Interface](infix_engine/screenshots/window.png)
 ### Terminal Output
-![Terminal Output](<img width="738" height="1054" alt="terminal" src="https://github.com/user-attachments/assets/50acc4f8-411c-4337-9c3b-eb93f3abfab1" />)
+![Terminal Output](infix_engine/screenshots/terminal.png)
+
+
 
 ---
 
@@ -102,7 +102,7 @@ infix-engine/
 ├── stack.h            → custom linked list stack implementation
 ├── index.html         → gamified web interface
 └── screenshots/
-    ├── website.png
+    ├── window.png
     └── terminal.png
 
 ```
@@ -113,7 +113,7 @@ infix-engine/
 
 Open `index.html` in any browser for an interactive gamified version with XP, coins and streak system.
 
-Live demo: **https://github.com/kamer-stack/infix-engine**
+Live demo: ** https://kamer-stack.github.io/infix-engine/**
 
 ---
 
