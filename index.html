@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>infix_engine</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:      #2a2155;
+  --bg2:     #3b2f6e;
+  --surface: #312868;
+  --card:    #3d3278;
+  --card2:   #453882;
+  --border:  #5a4a9a;
+  --purple:  #7c3aed;
+  --purpleg: #8b5cf6;
+  --purpled: #6d28d9;
+  --gold:    #fbbf24;
+  --goldd:   #d97706;
+  --green:   #22c55e;
+  --greend:  #16a34a;
+  --red:     #f87171;
+  --redd:    #dc2626;
+  --text:    #f0eeff;
+  --muted:   #9d8fc8;
+}
+
+body {
+  background: var(--bg);
+  background-image:
+    radial-gradient(ellipse 80% 40% at 50% 0%, rgba(124,58,237,0.22) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 30% at 80% 100%, rgba(59,47,110,0.5) 0%, transparent 60%);
+  color: var(--text);
+  font-family: 'Nunito', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 1rem 5rem;
+}
+
+/* CONFETTI */
+#confetti-wrap { position:fixed; inset:0; pointer-events:none; z-index:900; overflow:hidden; }
+.conf {
+  position: absolute; top: -20px;
+  border-radius: 2px; opacity: 0;
+  animation: cfall 2s ease-in forwards;
+}
+@keyframes cfall {
+  0%   { opacity:1; transform: translateY(0) rotate(0deg) scale(1); }
+  80%  { opacity:1; }
+  100% { opacity:0; transform: translateY(105vh) rotate(600deg) scale(0.5); }
+}
+
+/* ACHIEVEMENT BANNER */
+.ach-banner {
+  position: fixed; top: 1.2rem; left: 50%;
+  transform: translateX(-50%) translateY(-130px);
+  z-index: 800;
+  background: var(--card2);
+  border: 2px solid var(--gold);
+  border-radius: 18px;
+  padding: 10px 20px 10px 14px;
+  display: flex; align-items: center; gap: 12px;
+  box-shadow: 0 0 0 4px rgba(251,191,36,0.18), 0 8px 32px rgba(0,0,0,0.5);
+  transition: transform 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
+  white-space: nowrap;
+  min-width: 250px;
+}
+.ach-banner.show { transform: translateX(-50%) translateY(0); }
+.ach-medal { font-size: 2rem; }
+.ach-label { font-size: 0.6rem; font-weight: 800; color: var(--gold); text-transform: uppercase; letter-spacing: 0.12em; }
+.ach-name  { font-family: 'Fredoka One', cursive; font-size: 1rem; color: var(--text); }
+.ach-xp    { margin-left: auto; background: var(--gold); color: #78350f; border-radius: 20px; padding: 3px 11px; font-size: 0.72rem; font-weight: 800; }
+
+/* TOP BAR */
+.topbar {
+  width: 100%; max-width: 580px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1.1rem 0 0.6rem; gap: 0.4rem;
+}
+.pill {
+  display: flex; align-items: center; gap: 5px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 50px;
+  padding: 6px 14px;
+  font-size: 0.82rem; font-weight: 800;
+}
+.pill.gold-p  { border-color: #78350f44; color: var(--gold); background: rgba(251,191,36,0.1); }
+.pill.purp-p  { border-color: rgba(139,92,246,0.4); color: #c4b5fd; background: rgba(124,58,237,0.15); }
+.pill.fire-p  { border-color: rgba(251,146,60,0.35); color: #fb923c; background: rgba(251,146,60,0.1); }
+
+/* XP BAR */
+.xp-wrap { width:100%; max-width:580px; margin-bottom:1rem; }
+.xp-top  { display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; }
+.xp-lvl  { font-family:'Fredoka One',cursive; font-size:0.9rem; color:var(--purpleg); }
+.xp-num  { font-size:0.7rem; font-weight:700; color:var(--muted); }
+.xp-track {
+  height:12px; background:var(--surface);
+  border:1.5px solid var(--border); border-radius:20px; overflow:hidden;
+}
+.xp-fill {
+  height:100%; border-radius:20px;
+  background: linear-gradient(90deg, var(--purple), var(--purpleg), #a78bfa);
+  transition: width 0.7s cubic-bezier(0.4,0,0.2,1);
+  position:relative; overflow:hidden;
+}
+.xp-fill::after {
+  content:''; position:absolute; top:0; left:-100%; width:50%; height:100%;
+  background: rgba(255,255,255,0.25); transform:skewX(-20deg);
+  animation: xpshine 2.5s infinite;
+}
+@keyframes xpshine { 0%,100%{left:-100%} 60%{left:160%} }
+
+/* TITLE */
+.title-area { text-align:center; margin-bottom:1.2rem; }
+.title-main {
+  font-family:'Fredoka One',cursive;
+  font-size: clamp(2.6rem,8vw,3.5rem);
+  color: var(--text);
+  text-shadow: 0 0 40px rgba(139,92,246,0.7), 0 2px 0 rgba(0,0,0,0.4);
+  line-height:1; letter-spacing:0.02em;
+}
+.title-sub {
+  font-size:0.72rem; font-weight:800; color:var(--muted);
+  text-transform:uppercase; letter-spacing:0.12em; margin-top:4px;
+}
+
+/* STAGE PATH */
+.stage-path {
+  width:100%; max-width:580px;
+  display:flex; align-items:center; justify-content:center;
+  margin-bottom:1.6rem; gap:0;
+}
+.snode { display:flex; flex-direction:column; align-items:center; gap:4px; position:relative; z-index:1; }
+.snode-ring {
+  width:50px; height:50px; border-radius:50%;
+  background: var(--surface);
+  border: 2.5px solid var(--border);
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.3rem;
+  transition: all 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.snode-lbl { font-size:0.6rem; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em; }
+.snode.active .snode-ring {
+  background: var(--purple);
+  border-color: var(--purpleg);
+  box-shadow: 0 0 0 5px rgba(124,58,237,0.25), 0 0 20px rgba(139,92,246,0.5), 0 3px 10px rgba(0,0,0,0.4);
+  transform: scale(1.18);
+}
+.snode.active .snode-lbl { color: var(--purpleg); }
+.snode.done .snode-ring {
+  background: var(--green);
+  border-color: var(--greend);
+  box-shadow: 0 0 12px rgba(34,197,94,0.35), 0 3px 8px rgba(0,0,0,0.3);
+}
+.snode.done .snode-lbl { color: var(--green); }
+.sline {
+  flex:1; height:5px;
+  background: var(--border);
+  border-radius:3px; margin-bottom:18px;
+  transition: background 0.5s;
+  position:relative; overflow:hidden;
+}
+.sline.done { background: var(--green); }
+.sline.active-anim::after {
+  content:''; position:absolute; top:0; left:-100%; width:50%; height:100%;
+  background: rgba(255,255,255,0.4);
+  animation: lineshine 1.2s ease forwards;
+}
+@keyframes lineshine { 0%{left:-100%} 100%{left:200%} }
+
+/* CARDS */
+.card {
+  width:100%; max-width:580px;
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 22px;
+  padding: 1.4rem 1.5rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+  animation: cardIn 0.4s cubic-bezier(0.175,0.885,0.32,1.275) both;
+  position: relative; overflow: hidden;
+}
+.card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  background: linear-gradient(90deg, var(--purple), var(--purpleg), #a78bfa);
+  border-radius:22px 22px 0 0;
+}
+@keyframes cardIn {
+  from { opacity:0; transform:translateY(18px) scale(0.97); }
+  to   { opacity:1; transform:translateY(0) scale(1); }
+}
+
+.card-head { display:flex; align-items:center; gap:12px; margin-bottom:1.2rem; }
+.card-ico {
+  width:42px; height:42px; border-radius:13px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.2rem; flex-shrink:0;
+  background: rgba(124,58,237,0.2);
+  border: 1.5px solid rgba(139,92,246,0.35);
+}
+.card-ico.gold-i  { background:rgba(251,191,36,0.12); border-color:rgba(251,191,36,0.3); }
+.card-ico.green-i { background:rgba(34,197,94,0.12);  border-color:rgba(34,197,94,0.3); }
+.card-title { font-family:'Fredoka One',cursive; font-size:1.15rem; color:var(--text); line-height:1.1; }
+.card-sub   { font-size:0.7rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.07em; margin-top:2px; }
+
+/* SECTION LABEL */
+.section-label {
+  font-size:0.62rem; font-weight:800; color:var(--muted);
+  text-transform:uppercase; letter-spacing:0.1em;
+  margin-bottom:6px;
+}
+
+/* INPUT */
+.expr-input {
+  width:100%;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 13px;
+  color: var(--text);
+  font-family:'Nunito',sans-serif;
+  font-size: 1.05rem; font-weight:700;
+  padding: 0.85rem 1.1rem;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  margin-bottom: 0.85rem;
+  caret-color: var(--purpleg);
+}
+.expr-input:focus { border-color:var(--purpleg); box-shadow:0 0 0 4px rgba(139,92,246,0.18); }
+.expr-input::placeholder { color:var(--muted); font-weight:600; }
+
+/* CHIPS */
+.chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:1rem; }
+.chip {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 50px;
+  padding: 4px 13px;
+  font-size: 0.72rem; font-weight:700; color:var(--muted);
+  cursor: pointer;
+  font-family:'Courier New',monospace;
+  transition: all 0.18s;
+}
+.chip:hover { border-color:var(--purpleg); color:var(--purpleg); background:rgba(139,92,246,0.1); }
+
+/* BUTTONS */
+.btn {
+  width:100%; border:none; border-radius:15px;
+  font-family:'Fredoka One',cursive;
+  font-size:1.15rem; letter-spacing:0.04em;
+  padding: 0.9rem; cursor:pointer;
+  transition: transform 0.1s, box-shadow 0.2s, opacity 0.2s;
+}
+.btn:active { transform:scale(0.97); }
+
+.btn-purple {
+  background: var(--purple);
+  color: #fff;
+  box-shadow: 0 0 0 3px rgba(139,92,246,0.0), 0 4px 18px rgba(109,40,217,0.6);
+  transition: box-shadow 0.25s, transform 0.1s;
+}
+.btn-purple:hover {
+  box-shadow: 0 0 0 4px rgba(139,92,246,0.35), 0 6px 28px rgba(109,40,217,0.8);
+}
+
+.btn-green {
+  background: var(--green);
+  color: #052e16;
+  box-shadow: 0 4px 18px rgba(22,163,74,0.5);
+}
+.btn-green:hover { box-shadow: 0 0 0 4px rgba(34,197,94,0.25), 0 6px 24px rgba(22,163,74,0.7); }
+
+.btn-ghost {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  color: var(--muted);
+  font-family:'Nunito',sans-serif;
+  font-weight:800; font-size:0.95rem;
+  box-shadow: none;
+}
+
+/* POSTFIX BOX */
+.postfix-box {
+  background: var(--surface);
+  border: 1.5px solid rgba(139,92,246,0.4);
+  border-radius: 13px;
+  padding: 1rem 1.2rem;
+  font-family:'Courier New',monospace;
+  font-size: 1rem; font-weight:700;
+  color: var(--purpleg);
+  letter-spacing: 0.06em;
+  word-break: break-all;
+  min-height: 52px;
+  margin-bottom: 0.85rem;
+}
+
+/* MINI ACH STRIP */
+.mini-ach {
+  display:flex; align-items:center; gap:10px;
+  background: rgba(251,191,36,0.08);
+  border: 1px solid rgba(251,191,36,0.22);
+  border-radius: 13px;
+  padding: 0.75rem 1rem;
+}
+.mini-ach-ico  { font-size:1.6rem; }
+.mini-ach-name { font-family:'Fredoka One',cursive; font-size:0.9rem; color:var(--gold); }
+.mini-ach-sub  { font-size:0.65rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em; }
+.mini-ach-xp   { margin-left:auto; background:rgba(251,191,36,0.2); color:var(--gold); border:1px solid rgba(251,191,36,0.35); border-radius:20px; padding:3px 11px; font-size:0.7rem; font-weight:800; white-space:nowrap; }
+
+/* VARS GRID */
+.vars-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(155px,1fr)); gap:0.75rem; margin-bottom:1rem; }
+.var-item  { display:flex; flex-direction:column; gap:5px; }
+.var-lbl   { font-size:0.75rem; font-weight:800; color:var(--gold); text-transform:uppercase; letter-spacing:0.08em; }
+.var-inp {
+  background:var(--surface); border:2px solid var(--border);
+  border-radius:11px; color:var(--text);
+  font-family:'Nunito',sans-serif; font-size:1rem; font-weight:700;
+  padding:0.62rem 0.9rem; outline:none;
+  transition: all 0.2s; width:100%;
+}
+.var-inp:focus { border-color:var(--gold); box-shadow:0 0 0 3px rgba(251,191,36,0.14); }
+.var-inp.bad   { border-color:var(--redd); box-shadow:0 0 0 3px rgba(220,38,38,0.15); animation:shake 0.3s; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+
+/* RESULT */
+.result-center { text-align:center; padding:0.5rem 0 1rem; }
+.stars-row     { font-size:1.9rem; letter-spacing:5px; margin-bottom:0.5rem; }
+.result-num {
+  font-family:'Fredoka One',cursive; font-size:4.2rem;
+  color: var(--text);
+  text-shadow: 0 0 30px rgba(139,92,246,0.8), 0 2px 0 rgba(0,0,0,0.4);
+  line-height:1; margin-bottom:0.85rem;
+  animation: popIn 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+@keyframes popIn { from{transform:scale(0.4);opacity:0} to{transform:scale(1);opacity:1} }
+.result-num.error { font-size:1rem; font-family:'Nunito',sans-serif; font-weight:800; color:var(--red); text-shadow:none; }
+
+.exit-pill {
+  display:inline-flex; align-items:center; gap:5px;
+  border-radius:50px; padding:5px 16px;
+  font-size:0.75rem; font-weight:800; border:1.5px solid;
+  margin-bottom:1rem;
+}
+.ep-ok  { background:rgba(34,197,94,0.1);  border-color:rgba(34,197,94,0.35); color:var(--green); }
+.ep-err { background:rgba(248,113,113,0.1); border-color:rgba(248,113,113,0.35); color:var(--red); }
+
+.divider { height:1.5px; background:var(--border); border-radius:2px; margin:1rem 0; opacity:0.5; }
+
+.hidden { display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="confetti-wrap"></div>
+
+<!-- Achievement Banner -->
+<div class="ach-banner" id="ach-banner">
+  <div class="ach-medal" id="ach-medal">🏅</div>
+  <div>
+    <div class="ach-label">Achievement Unlocked!</div>
+    <div class="ach-name" id="ach-name">—</div>
+  </div>
+  <div class="ach-xp" id="ach-xp">+0 XP</div>
+</div>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="pill gold-p">✦ <span id="coins">0</span></div>
+  <div class="pill purp-p">★ LVL <span id="level">1</span></div>
+  <div class="pill fire-p">🔥 <span id="streak">0</span> streak</div>
+</div>
+
+<!-- XP Bar -->
+<div class="xp-wrap">
+  <div class="xp-top">
+    <span class="xp-lvl">Level <span id="level2">1</span> Apprentice</span>
+    <span class="xp-num" id="xp-num">0 / 500 XP</span>
+  </div>
+  <div class="xp-track">
+    <div class="xp-fill" id="xp-fill" style="width:0%"></div>
+  </div>
+</div>
+
+<!-- Title -->
+<div class="title-area">
+  <div class="title-main">infix-engine</div>
+  <div class="title-sub">Expression Evaluator </div>
+</div>
+
+<!-- Stage Path -->
+<div class="stage-path">
+  <div class="snode active" id="sn1"><div class="snode-ring" id="sr1">🧩</div><div class="snode-lbl">Input</div></div>
+  <div class="sline" id="sl1"></div>
+  <div class="snode" id="sn2"><div class="snode-ring" id="sr2">🔄</div><div class="snode-lbl">Postfix</div></div>
+  <div class="sline" id="sl2"></div>
+  <div class="snode" id="sn3"><div class="snode-ring" id="sr3">💰</div><div class="snode-lbl">Values</div></div>
+  <div class="sline" id="sl3"></div>
+  <div class="snode" id="sn4"><div class="snode-ring" id="sr4">🎯</div><div class="snode-lbl">Result</div></div>
+</div>
+
+<!-- Card 1: Input -->
+<div class="card" id="c1">
+  <div class="card-head">
+    <div class="card-ico">🧩</div>
+    <div>
+      <div class="card-title">Enter Your Expression</div>
+      <div class="card-sub">Stage 1 · Infix Notation</div>
+    </div>
+  </div>
+  <div class="section-label">Daily Challenge</div>
+  <input class="expr-input" id="expr-in" type="text" placeholder="e.g.  a + b * (c + 2)" autocomplete="off" spellcheck="false" />
+  <div class="chips">
+    <div class="chip" onclick="useEx('a + b * (c + 2)')">a + b * (c + 2)</div>
+    <div class="chip" onclick="useEx('{a + [b * (c + d)]}')">&#123;a + [b*(c+d)]&#125;</div>
+    <div class="chip" onclick="useEx('-a + b * c')">-a + b * c</div>
+    <div class="chip" onclick="useEx('x / (y - z)')">x / (y - z)</div>
+  </div>
+  <button class="btn btn-purple" onclick="doConvert()">▶ SOLVE NOW</button>
+</div>
+
+<!-- Card 2: Postfix -->
+<div class="card hidden" id="c2">
+  <div class="card-head">
+    <div class="card-ico">🔄</div>
+    <div>
+      <div class="card-title">Postfix Notation</div>
+      <div class="card-sub">Stage 2 · Shunting Yard Algorithm</div>
+    </div>
+  </div>
+  <div class="section-label">Converted Expression</div>
+  <div class="postfix-box" id="postfix-out"></div>
+  <div class="mini-ach">
+    <div class="mini-ach-ico">🏆</div>
+    <div>
+      <div class="mini-ach-name">Shunting Yard Master!</div>
+      <div class="mini-ach-sub">Infix → Postfix complete</div>
+    </div>
+    <div class="mini-ach-xp">+150 XP</div>
+  </div>
+</div>
+
+<!-- Card 3: Variables -->
+<div class="card hidden" id="c3">
+  <div class="card-head">
+    <div class="card-ico gold-i">💰</div>
+    <div>
+      <div class="card-title">Assign Variable Values</div>
+      <div class="card-sub">Stage 3 · Feed the Evaluator</div>
+    </div>
+  </div>
+  <div class="vars-grid" id="vars-grid"></div>
+  <button class="btn btn-green" onclick="doEval()">⚡ EVALUATE EXPRESSION</button>
+</div>
+
+<!-- Card 4: Result -->
+<div class="card hidden" id="c4">
+  <div class="card-head">
+    <div class="card-ico green-i">🎯</div>
+    <div>
+      <div class="card-title">Final Result</div>
+      <div class="card-sub">Stage 4 · Quest Complete!</div>
+    </div>
+  </div>
+  <div class="result-center">
+    <div class="stars-row" id="stars">⭐ ⭐ ⭐</div>
+    <div class="result-num" id="result-val">—</div>
+    <div><span class="exit-pill ep-ok" id="exit-pill">✓ exit 0 · success</span></div>
+  </div>
+  <div class="divider"></div>
+  <button class="btn btn-ghost" onclick="doReset()">🔁 Try Another Expression</button>
+</div>
+
+<script>
+let xp=0, coins=0, streak=0, level=1;
+let postfix=[];
+
+const TITLES = ['Apprentice','Caster','Wizard','Archmage','Legend'];
+
+function addXP(n) {
+  xp += n; coins += Math.floor(n*0.5);
+  document.getElementById('coins').textContent = coins;
+  const cap = level*500;
+  if (xp >= cap) { xp -= cap; level++; }
+  document.getElementById('level').textContent = level;
+  document.getElementById('level2').textContent = level;
+  const t = TITLES[Math.min(level-1, TITLES.length-1)];
+  document.querySelector('.xp-lvl').innerHTML = `Level <span id="level2">${level}</span> ${t}`;
+  const pct = Math.min((xp/(level*500))*100, 100);
+  document.getElementById('xp-fill').style.width = pct + '%';
+  document.getElementById('xp-num').textContent = xp + ' / ' + (level*500) + ' XP';
+}
+
+function showAch(medal, name, xpAmt) {
+  document.getElementById('ach-medal').textContent = medal;
+  document.getElementById('ach-name').textContent = name;
+  document.getElementById('ach-xp').textContent = xpAmt > 0 ? '+'+xpAmt+' XP' : 'streak lost!';
+  const b = document.getElementById('ach-banner');
+  b.classList.add('show');
+  setTimeout(() => b.classList.remove('show'), 2800);
+}
+
+function confetti() {
+  const wrap = document.getElementById('confetti-wrap');
+  wrap.innerHTML = '';
+  const cols = ['#7c3aed','#a78bfa','#fbbf24','#f97316','#22c55e','#ec4899','#38bdf8','#e879f9'];
+  for (let i = 0; i < 70; i++) {
+    const el = document.createElement('div');
+    el.className = 'conf';
+    el.style.cssText = `left:${Math.random()*100}%;width:${7+Math.random()*8}px;height:${9+Math.random()*9}px;background:${cols[Math.floor(Math.random()*cols.length)]};border-radius:${Math.random()>.5?'50%':'2px'};animation-delay:${Math.random()*.9}s;animation-duration:${1.4+Math.random()*.8}s`;
+    wrap.appendChild(el);
+    setTimeout(()=>el.remove(), 2600);
+  }
+}
+
+function setStage(n) {
+  for (let i=1;i<=4;i++) {
+    const nd=document.getElementById('sn'+i);
+    nd.className='snode';
+    if(i<n) nd.classList.add('done');
+    if(i===n) nd.classList.add('active');
+  }
+  for (let i=1;i<=3;i++) {
+    const ln=document.getElementById('sl'+i);
+    ln.className='sline'+(i<n?' done':'');
+    if(i===n-1) { ln.classList.add('active-anim'); }
+  }
+}
+
+function show(id){ document.getElementById(id).classList.remove('hidden'); }
+function hide(id){ document.getElementById(id).classList.add('hidden'); }
+function useEx(e){ document.getElementById('expr-in').value=e; document.getElementById('expr-in').focus(); }
+
+// ── Tokenizer ──
+function tokenize(expr) {
+  const tokens=[]; let i=0;
+  while(i<expr.length){
+    if(' \t'.includes(expr[i])){i++;continue;}
+    if(/\d/.test(expr[i])){
+      let n='';
+      while(i<expr.length&&/\d/.test(expr[i]))n+=expr[i++];
+      if(i<expr.length&&/[a-zA-Z_]/.test(expr[i]))throw{code:1,msg:"Syntax error: invalid token '"+n+expr[i]+"'"};
+      tokens.push({type:'NUM',val:n});continue;
+    }
+    if(/[a-zA-Z_]/.test(expr[i])){
+      let v='';
+      while(i<expr.length&&/[a-zA-Z0-9_]/.test(expr[i]))v+=expr[i++];
+      tokens.push({type:'VAR',val:v});continue;
+    }
+    if('+-*/'.includes(expr[i])){tokens.push({type:'OP',val:expr[i++]});continue;}
+    if('([{'.includes(expr[i])){tokens.push({type:'LP',val:expr[i++]});continue;}
+    if(')]}'.includes(expr[i])){tokens.push({type:'RP',val:expr[i++]});continue;}
+    throw{code:1,msg:"Syntax error: unexpected character '"+expr[i]+"'"};
+  }
+  return tokens;
+}
+
+function prec(op){return(op==='*'||op==='/')?2:1;}
+function bmatch(o,c){return(o==='('&&c===')')||(o==='['&&c===']')||(o==='{'&&c==='}');}
+
+function toPostfix(tokens){
+  if(!tokens.length)throw{code:3,msg:'Logical error: empty expression'};
+  if(tokens[0].type==='OP'&&(tokens[0].val==='*'||tokens[0].val==='/'))throw{code:1,msg:'Syntax error: cannot start with '+tokens[0].val};
+  if(tokens[tokens.length-1].type==='OP')throw{code:1,msg:'Syntax error: cannot end with operator'};
+  for(let i=1;i<tokens.length;i++){
+    const c=tokens[i],p=tokens[i-1];
+    if(c.type==='OP'&&p.type==='OP'&&c.val!=='-')throw{code:1,msg:'Syntax error: two operators in a row'};
+    if((c.type==='NUM'||c.type==='VAR')&&(p.type==='NUM'||p.type==='VAR'))throw{code:1,msg:'Syntax error: missing operator between operands'};
+    if(p.type==='LP'&&c.type==='RP')throw{code:3,msg:'Logical error: empty brackets'};
+  }
+  const out=[],stk=[];
+  for(let i=0;i<tokens.length;i++){
+    const t=tokens[i];
+    if(t.type==='NUM'||t.type==='VAR'){out.push(t);}
+    else if(t.type==='OP'){
+      if(t.val==='-'){const u=i===0||tokens[i-1].type==='OP'||tokens[i-1].type==='LP';if(u)out.push({type:'NUM',val:'0'});}
+      while(stk.length&&stk[stk.length-1].type==='OP'&&prec(stk[stk.length-1].val)>=prec(t.val))out.push(stk.pop());
+      stk.push(t);
+    } else if(t.type==='LP'){stk.push(t);}
+    else if(t.type==='RP'){
+      let m=false;
+      while(stk.length){if(stk[stk.length-1].type==='LP'){if(!bmatch(stk[stk.length-1].val,t.val))throw{code:1,msg:'Syntax error: mismatched brackets'};stk.pop();m=true;break;}out.push(stk.pop());}
+      if(!m)throw{code:1,msg:'Syntax error: extra closing bracket'};
+    }
+  }
+  while(stk.length){if(stk[stk.length-1].type==='LP')throw{code:1,msg:'Syntax error: unclosed bracket'};out.push(stk.pop());}
+  return out;
+}
+
+function evalPostfix(pf,vals){
+  const stk=[];
+  for(const t of pf){
+    if(t.type==='NUM'){stk.push(parseFloat(t.val));}
+    else if(t.type==='VAR'){if(vals[t.val]===undefined)throw{code:2,msg:"Runtime error: undefined variable '"+t.val+"'"};stk.push(vals[t.val]);}
+    else if(t.type==='OP'){
+      if(stk.length<2)throw{code:3,msg:'Logical error: not enough operands'};
+      const b=stk.pop(),a=stk.pop();
+      if(t.val==='+')stk.push(a+b);
+      else if(t.val==='-')stk.push(a-b);
+      else if(t.val==='*')stk.push(a*b);
+      else if(t.val==='/'){if(b===0)throw{code:2,msg:'Runtime error: division by zero'};stk.push(a/b);}
+    }
+  }
+  if(stk.length!==1)throw{code:3,msg:'Logical error: invalid expression structure'};
+  return stk[0];
+}
+
+function doConvert(){
+  const expr=document.getElementById('expr-in').value.trim();
+  hide('c2');hide('c3');hide('c4');
+  try{
+    const tok=tokenize(expr);
+    postfix=toPostfix(tok);
+    document.getElementById('postfix-out').textContent=postfix.map(t=>t.val).join(' ');
+    show('c2'); setStage(2);
+    addXP(150); streak++; document.getElementById('streak').textContent=streak;
+    showAch('🏆','Shunting Yard Master!',150);
+    const vars=[...new Set(postfix.filter(t=>t.type==='VAR').map(t=>t.val))].sort();
+    const grid=document.getElementById('vars-grid');
+    grid.innerHTML='';
+    if(vars.length>0){
+      vars.forEach(v=>{
+        const d=document.createElement('div');d.className='var-item';
+        d.innerHTML=`<div class="var-lbl">🔑 ${v}</div><input class="var-inp" id="vi-${v}" type="number" placeholder="value…" step="any"/>`;
+        grid.appendChild(d);
+      });
+      show('c3');setStage(3);
+    } else { doEval(); }
+  }catch(e){showErr(e);}
+}
+
+function doEval(){
+  const items=document.querySelectorAll('#vars-grid .var-item');
+  const vals={};let ok=true;
+  for(const item of items){
+    const lbl=item.querySelector('.var-lbl').textContent.replace('🔑 ','').trim();
+    const inp=item.querySelector('input');
+    inp.classList.remove('bad');
+    if(inp.value===''){inp.classList.add('bad');inp.focus();ok=false;break;}
+    vals[lbl]=parseFloat(inp.value);
+  }
+  if(!ok)return;
+  try{
+    const res=evalPostfix(postfix,vals);
+    const fmt=Number.isInteger(res)?res:parseFloat(res.toFixed(6));
+    document.getElementById('result-val').textContent=fmt;
+    document.getElementById('result-val').className='result-num';
+    document.getElementById('stars').textContent='⭐ ⭐ ⭐';
+    document.getElementById('exit-pill').textContent='✓ exit 0 · success';
+    document.getElementById('exit-pill').className='exit-pill ep-ok';
+    show('c4');setStage(4);
+    addXP(200);confetti();
+    showAch('🎉','Expression Solved!',200);
+  }catch(e){showErr(e);}
+}
+
+function showErr(e){
+  const code=e.code||1;
+  const lbl=['','Syntax Error','Runtime Error','Logical Error'];
+  document.getElementById('result-val').textContent=e.msg||'Unknown error';
+  document.getElementById('result-val').className='result-num error';
+  document.getElementById('stars').textContent='💀 💀 💀';
+  document.getElementById('exit-pill').textContent='✗ exit '+code+' · '+(lbl[code]||'Error');
+  document.getElementById('exit-pill').className='exit-pill ep-err';
+  show('c4');setStage(4);
+  streak=0;document.getElementById('streak').textContent=0;
+  showAch('💥','Streak Lost!',0);
+}
+
+function doReset(){
+  hide('c2');hide('c3');hide('c4');
+  document.getElementById('expr-in').value='';
+  document.getElementById('expr-in').focus();
+  setStage(1);postfix=[];
+}
+
+document.getElementById('expr-in').addEventListener('keydown',e=>{if(e.key==='Enter')doConvert();});
+</script>
+</body>
+</html>
