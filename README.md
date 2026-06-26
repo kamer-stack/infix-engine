@@ -113,7 +113,7 @@ infix-engine/
 
 Open `index.html` in any browser for an interactive gamified version with XP, coins and streak system.
 
-Live demo: ** https://kamer-stack.github.io/infix-engine/**
+Live demo: ** https://kamer-heap.github.io/infix-engine/**
 
 ---
 
